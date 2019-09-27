@@ -1,0 +1,21 @@
+{
+  "name": "monologue",
+  "version": "1.0.0",
+  "description": "serverless system-to-system messaging solution based on AWS Lambda",
+  "main": "index.js",
+  "scripts": {
+    "package": "sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket rootstream",
+    "deploy": "sam deploy --template-file packaged.yaml --stack-name monologue --capabilities CAPABILITY_IAM",
+    "describe": "aws cloudformation describe-stacks --stack-name monologue --query 'Stacks[].Outputs'"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rootstream/monologue.git"
+  },
+  "author": "Sepehr Laal",
+  "license": "UNLICENSED",
+  "bugs": {
+    "url": "https://github.com/rootstream/monologue/issues"
+  },
+  "homepage": "https://github.com/rootstream/monologue#readme"
+}
