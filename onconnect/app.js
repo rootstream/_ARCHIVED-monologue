@@ -1,22 +1,12 @@
-// Copyright 2018 Amazon.com, Inc. or its affiliates. All Rights Reserved.
-// SPDX-License-Identifier: MIT-0
+const _ = require("lodash");
+const AWS = require("aws-sdk");
 
-var AWS = require("aws-sdk");
-AWS.config.update({ region: process.env.AWS_REGION });
-var DDB = new AWS.DynamoDB({ apiVersion: "2012-10-08" });
+const region = _.get(process.env, "AWS_REGION", "us-west-2");
+AWS.config.update({ region });
 
-exports.handler = function (event, context, callback) {
-  var putParams = {
-    TableName: process.env.TABLE_NAME,
-    Item: {
-      connectionId: { S: event.requestContext.connectionId }
-    }
+exports.handler = async function(event, _context) {
+  return {
+    statusCode: 200,
+    body: { id: event.requestContext.connectionId }
   };
-
-  DDB.putItem(putParams, function (err) {
-    callback(null, {
-      statusCode: err ? 500 : 200,
-      body: err ? "Failed to connect: " + JSON.stringify(err) : "Connected."
-    });
-  });
 };
