@@ -22,5 +22,5 @@ exports.handler = async function(event, _context) {
     return { statusCode: 500, body: e.stack };
   }
 
-  return { statusCode: 200, body: "Data sent." };
+  return { statusCode: 200, body: "OK" };
 };
