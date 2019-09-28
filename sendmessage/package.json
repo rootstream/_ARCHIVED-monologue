@@ -6,7 +6,6 @@
   "author": "SAM CLI",
   "license": "MIT",
   "dependencies": {
-    "aws-sdk": "^2.537.0",
-    "lodash": "^4.17.15"
+    "aws-sdk": "^2.537.0"
   }
 }

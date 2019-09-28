@@ -1,5 +1,4 @@
 const AWS = require("aws-sdk");
-const assert = require("assert");
 
 exports.handler = async function(event, _context) {
   const apiGatewayManagementApi = new AWS.ApiGatewayManagementApi({
@@ -10,9 +9,7 @@ exports.handler = async function(event, _context) {
     const messageBody = JSON.parse(event.body);
     const payload = messageBody.payload;
     const from = event.requestContext.connectionId;
-    const to = messageBody.to;
-
-    assert.ok(to, "you must supply a recipient address");
+    const to = from; // this route responds back to sender
 
     await apiGatewayManagementApi
       .postToConnection({

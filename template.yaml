@@ -12,54 +12,16 @@ Resources:
       Name: Monologue
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: "$request.body.action"
+      Description: >
+        WSS API endpoint for a Monologue deployment.
 
-  ConnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref Monologue
-      RouteKey: $connect
-      AuthorizationType: NONE
-      OperationName: ConnectRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref ConnectIntegration
-
-  ConnectIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref Monologue
-      Description: Connect Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${OnConnectFunction.Arn}/invocations
-
-  SendRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref Monologue
-      RouteKey: sendmessage
-      AuthorizationType: NONE
-      OperationName: SendRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref SendIntegration
-
-  SendIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref Monologue
-      Description: Send Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+        See https://github.com/rootstream/monologue
 
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - ConnectRoute
-      - SendRoute
+      - LoopbackRoute
+      - SendMessageRoute
     Properties:
       ApiId: !Ref Monologue
 
@@ -71,22 +33,71 @@ Resources:
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
 
-  OnConnectFunction:
+  LoopbackRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Monologue
+      RouteKey: loopback
+      AuthorizationType: NONE
+      OperationName: LoopbackRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref LoopbackIntegration
+
+  LoopbackIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Monologue
+      Description: Loopback Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LoopbackFunction.Arn}/invocations
+
+  LoopbackFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: onconnect/
+      CodeUri: loopback/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs10.x
+      Policies:
+        - Statement:
+            - Effect: Allow
+              Action:
+                - "execute-api:ManageConnections"
+              Resource:
+                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*"
 
-  OnConnectPermission:
+  LoopbackPermission:
     Type: AWS::Lambda::Permission
     DependsOn:
       - Monologue
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref OnConnectFunction
+      FunctionName: !Ref LoopbackFunction
       Principal: apigateway.amazonaws.com
+
+  SendMessageRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Monologue
+      RouteKey: sendmessage
+      AuthorizationType: NONE
+      OperationName: SendMessageRoute
+      Target: !Join
+        - "/"
+        - - "integrations"
+          - !Ref SendMessageIntegration
+
+  SendMessageIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Monologue
+      Description: Send Integration
+      IntegrationType: AWS_PROXY
+      IntegrationUri:
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
 
   SendMessageFunction:
     Type: AWS::Serverless::Function
@@ -113,16 +124,8 @@ Resources:
       Principal: apigateway.amazonaws.com
 
 Outputs:
-  OnConnectFunctionArn:
-    Description: "OnConnect function ARN"
-    Value: !GetAtt OnConnectFunction.Arn
-
-  SendMessageFunctionArn:
-    Description: "SendMessage function ARN"
-    Value: !GetAtt SendMessageFunction.Arn
-
   WebSocketURI:
-    Description: "The WSS Protocol URI to connect to"
+    Description: "Monologue WSS Protocol URI to connect to"
     Value:
       !Join [
         "",

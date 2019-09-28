@@ -6,7 +6,8 @@
   "scripts": {
     "package": "sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket rootstream",
     "deploy": "sam deploy --template-file packaged.yaml --stack-name monologue --capabilities CAPABILITY_IAM",
-    "describe": "aws cloudformation describe-stacks --stack-name monologue --query 'Stacks[].Outputs'"
+    "describe": "aws cloudformation describe-stacks --stack-name monologue --query 'Stacks[].Outputs'",
+    "undeploy": "aws cloudformation delete-stack --stack-name monologue"
   },
   "repository": {
     "type": "git",
