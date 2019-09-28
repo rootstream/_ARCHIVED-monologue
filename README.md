@@ -1,66 +1,64 @@
-# simple-websockets-chat-app
+# monologue
 
-This is the code and template for the simple-websocket-chat-app.  There are three functions contained within the directories and a SAM template that wires them up to a DynamoDB table and provides the minimal set of permissions needed to run the app:
+Infinitely scalable serverless system-to-system messaging solution based on AWS Lambda.
 
-```
-.
-├── README.md                   <-- This instructions file
-├── onconnect                   <-- Source code onconnect
-├── ondisconnect                <-- Source code ondisconnect
-├── sendmessage                 <-- Source code sendmessage
-└── template.yaml               <-- SAM template for Lambda Functions and DDB
-```
+This solution was originally designed to be used in rootstream peer engine to make the
+engine serverless by relaying messages in between instances.
 
+## deploy
 
-# Deploying to your account
+You need both AWS and AWS SAM CLIs installed and configured.
 
-You have two choices for how you can deploy this code.
+To deploy to your AWS account:
 
-## Serverless Application Repository
-
-The first and fastest way is to use AWS's Serverless Application Respository to directly deploy the components of this app into your account without needing to use any additional tools. You'll be able to review everything before it deploys to make sure you understand what will happen.  Click through to see the [application details](https://serverlessrepo.aws.amazon.com/applications/arn:aws:serverlessrepo:us-east-1:729047367331:applications~simple-websockets-chat-app).
-
-## AWS CLI commands
-
-If you prefer, you can install the [AWS SAM CLI](https://docs.aws.amazon.com/serverless-application-model/latest/developerguide/serverless-sam-cli-install.html) and use it to package, deploy, and describe your application.  These are the commands you'll need to use:
-
-```
-sam package \
-    --template-file template.yaml \
-    --output-template-file packaged.yaml \
-    --s3-bucket REPLACE_THIS_WITH_YOUR_S3_BUCKET_NAME
-
-sam deploy \
-    --template-file packaged.yaml \
-    --stack-name simple-websocket-chat-app \
-    --capabilities CAPABILITY_IAM \
-    --parameter-overrides MyParameterSample=MySampleValue
-
-aws cloudformation describe-stacks \
-    --stack-name simple-websocket-chat-app --query 'Stacks[].Outputs'
+```bash
+npm run package
+npm run deploy
+npm run describe
 ```
 
-## Testing the chat API
+To remove the deployment:
 
-To test the WebSocket API, you can use [wscat](https://github.com/websockets/wscat), an open-source command line tool.
+```bash
+npm run undeploy
+```
 
-1. [Install NPM](https://www.npmjs.com/get-npm).
-2. Install wscat:
-``` bash
-$ npm install -g wscat
-```
-3. On the console, connect to your published API endpoint by executing the following command:
-``` bash
-$ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/{STAGE}
-```
-4. To test the sendMessage function, send a JSON message like the following example. The Lambda function sends it back using the callback URL: 
-``` bash
-$ wscat -c wss://{YOUR-API-ID}.execute-api.{YOUR-REGION}.amazonaws.com/prod
+## test drive
+
+you can use `wscat` utility to test the deployment (`npm install -g wscat`)
+
+bash window 1:
+
+```bash
+wscat -c wss://btfufl6oid.execute-api.us-west-2.amazonaws.com/latest
 connected (press CTRL+C to quit)
-> {"message":"sendmessage", "data":"hello world"}
-< hello world
+> {"action":"loopback"}
+< {"to":"AtuLLemUPHcCItg=","from":"AtuLLemUPHcCItg="}
+> {"action":"sendmessage","payload":"hello!","to":"AtuMbe4FvHcCE0g="}
+< {"to":"AtuLLemUPHcCItg=","from":"AtuMbe4FvHcCE0g=","payload":"hello!"}
+> {"action":"sendmessage","payload":"hello hello!","to":"AtuMbe4FvHcCE0g="}
+< {"to":"AtuLLemUPHcCItg=","from":"AtuMbe4FvHcCE0g=","payload":"hello!???"}
 ```
 
-## License Summary
+bash window 2:
 
-This sample code is made available under a modified MIT license. See the LICENSE file.
+```bash
+wscat -c wss://btfufl6oid.execute-api.us-west-2.amazonaws.com/latest
+connected (press CTRL+C to quit)
+> {"action":"loopback"}
+< {"to":"AtuMbe4FvHcCE0g=","from":"AtuMbe4FvHcCE0g="}
+< {"to":"AtuMbe4FvHcCE0g=","from":"AtuLLemUPHcCItg=","payload":"hello!"}
+> {"action":"sendmessage","payload":"hello!","to":"AtuLLemUPHcCItg="}
+< {"to":"AtuMbe4FvHcCE0g=","from":"AtuLLemUPHcCItg=","payload":"hello hello!"}
+> {"action":"sendmessage","payload":"hello!???","to":"AtuLLemUPHcCItg="}
+```
+
+## design
+
+Monologue is extremely simple in design. Once deployed it creates exactly two routes
+within an API Gateway websocket deployment. The two routes are:
+
+1. `sendmessage`: accepts a `to` field and an optional `payload` field. `to` is an API Gateway connection ID, This route then sends the payload to the specified connection ID in API Gateway.
+1. `loopback`: accepts an optional `payload` field. This route then sends the payload back to the sender with its connection ID in API Gateway. Used for connection identification.
+
+The Monologue client uses these two routes to implement a peer to peer RPC solution very similar to [socket.io ACKs](https://socket.io/docs/#Sending-and-getting-data-acknowledgements).
