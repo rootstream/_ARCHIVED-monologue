@@ -1,4 +1,4 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
   monologue
@@ -11,7 +11,7 @@ Resources:
     Properties:
       Name: Monologue
       ProtocolType: WEBSOCKET
-      RouteSelectionExpression: "$request.body.action"
+      RouteSelectionExpression: '$request.body.action'
       Description: >
         WSS API endpoint for a Monologue deployment.
 
@@ -20,7 +20,6 @@ Resources:
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - LoopbackRoute
       - SendMessageRoute
     Properties:
       ApiId: !Ref Monologue
@@ -33,51 +32,6 @@ Resources:
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
 
-  LoopbackRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref Monologue
-      RouteKey: loopback
-      AuthorizationType: NONE
-      OperationName: LoopbackRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref LoopbackIntegration
-
-  LoopbackIntegration:
-    Type: AWS::ApiGatewayV2::Integration
-    Properties:
-      ApiId: !Ref Monologue
-      Description: Loopback Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LoopbackFunction.Arn}/invocations
-
-  LoopbackFunction:
-    Type: AWS::Serverless::Function
-    Properties:
-      CodeUri: loopback/
-      Handler: app.handler
-      MemorySize: 256
-      Runtime: nodejs10.x
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*"
-
-  LoopbackPermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - Monologue
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref LoopbackFunction
-      Principal: apigateway.amazonaws.com
-
   SendMessageRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
@@ -86,8 +40,8 @@ Resources:
       AuthorizationType: NONE
       OperationName: SendMessageRoute
       Target: !Join
-        - "/"
-        - - "integrations"
+        - '/'
+        - - 'integrations'
           - !Ref SendMessageIntegration
 
   SendMessageIntegration:
@@ -110,9 +64,9 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
-                - "execute-api:ManageConnections"
+                - 'execute-api:ManageConnections'
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*"
+                - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*'
 
   SendMessagePermission:
     Type: AWS::Lambda::Permission
@@ -125,16 +79,5 @@ Resources:
 
 Outputs:
   WebSocketURI:
-    Description: "Monologue WSS Protocol URI to connect to"
-    Value:
-      !Join [
-        "",
-        [
-          "wss://",
-          !Ref Monologue,
-          ".execute-api.",
-          !Ref "AWS::Region",
-          ".amazonaws.com/",
-          !Ref "Stage",
-        ],
-      ]
+    Description: 'Monologue WSS Protocol URI to connect to'
+    Value: !Join ['', ['wss://', !Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
