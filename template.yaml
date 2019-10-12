@@ -5,6 +5,11 @@ Description: >
 
   serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS
 
+Parameters:
+  DefaultStage:
+    Type: String
+    Default: latest
+
 Resources:
   Monologue:
     Type: AWS::ApiGatewayV2::Api
@@ -28,7 +33,7 @@ Resources:
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      StageName: latest
+      StageName: !Ref DefaultStage
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
 
@@ -60,7 +65,7 @@ Resources:
       ApiId: !Ref Monologue
       IntegrationType: AWS_PROXY
       IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/monologue-${AWS::AccountId}/invocations
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations
 
   RouterFunction:
     Type: AWS::Serverless::Function
@@ -95,12 +100,10 @@ Resources:
           CONNECT_QUEUE: !Ref ConnectQueue
           DEPLOY_REGION: !Sub ${AWS::Region}
           AGW_ENDPOINT:
-            !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
+            !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref DefaultStage]]
 
   AGWRouterInvokePermission:
     Type: AWS::Lambda::Permission
-    DependsOn:
-      - Monologue
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref RouterFunction
