@@ -86,10 +86,12 @@ Resources:
         - Statement:
             - Effect: Allow
               Action:
-                - sqs:SendMessage
+                - 'sqs:SendMessage'
+                - 'sqs:SendMessageBatch'
               Resource: !Sub ${ConnectQueue.Arn}
       Environment:
         Variables:
+          DEBUG: monologue:*
           CONNECT_QUEUE: !Ref ConnectQueue
           DEPLOY_REGION: !Sub ${AWS::Region}
           AGW_ENDPOINT:
