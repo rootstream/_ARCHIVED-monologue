@@ -45,7 +45,7 @@ const messageSchema = {
   required: ['to', 'from'],
 };
 
-AWS.config.update({ region: process.env.AWS_REGION });
+AWS.config.update({ region: process.env.DEPLOY_REGION });
 const agw = new AWS.ApiGatewayManagementApi({ endpoint: process.env.AGW_ENDPOINT });
 const sqs = new AWS.SQS();
 
