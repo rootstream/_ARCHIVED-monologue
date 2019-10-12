@@ -60,11 +60,12 @@ Resources:
       ApiId: !Ref Monologue
       IntegrationType: AWS_PROXY
       IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ControlFunction.Arn}/invocations
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/monologue-${AWS::AccountId}/invocations
 
   RouterFunction:
     Type: AWS::Serverless::Function
     Properties:
+      FunctionName: !Sub 'monologue-${AWS::AccountId}'
       CodeUri: router/
       Handler: app.handler
       MemorySize: 256
