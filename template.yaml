@@ -1,9 +1,9 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  monologue
+  RootStream Monologue
 
-  serverless system-to-system messaging solution based on AWS Lambda
+  serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS
 
 Resources:
   Monologue:
@@ -11,7 +11,7 @@ Resources:
     Properties:
       Name: Monologue
       ProtocolType: WEBSOCKET
-      RouteSelectionExpression: '$request.body.action'
+      RouteSelectionExpression: '$request.body.route'
       Description: >
         WSS API endpoint for a Monologue deployment.
 
@@ -20,7 +20,8 @@ Resources:
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - SendMessageRoute
+      - DefaultRoute
+      - ConnectRoute
     Properties:
       ApiId: !Ref Monologue
 
@@ -28,38 +29,52 @@ Resources:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
       StageName: latest
-      Description: Latest Stable Stage
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
 
-  SendMessageRoute:
+  DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref Monologue
-      RouteKey: sendmessage
+      RouteKey: $default
       AuthorizationType: NONE
-      OperationName: SendMessageRoute
       Target: !Join
         - '/'
         - - 'integrations'
-          - !Ref SendMessageIntegration
+          - !Ref AGWIntegration
 
-  SendMessageIntegration:
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Monologue
+      RouteKey: $connect
+      AuthorizationType: NONE
+      Target: !Join
+        - '/'
+        - - 'integrations'
+          - !Ref AGWIntegration
+
+  AGWIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref Monologue
-      Description: Send Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ControlFunction.Arn}/invocations
 
-  SendMessageFunction:
+  ControlFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: sendmessage/
+      CodeUri: router/
       Handler: app.handler
       MemorySize: 256
       Runtime: nodejs10.x
+      Events:
+        ConnectSQSEvent:
+          Type: SQS
+          Properties:
+            Queue: !GetAtt ConnectQueue.Arn
+            BatchSize: 10
       Policies:
         - Statement:
             - Effect: Allow
@@ -67,15 +82,35 @@ Resources:
                 - 'execute-api:ManageConnections'
               Resource:
                 - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*'
+        - Statement:
+            - Effect: Allow
+              Action:
+                - sqs:SendMessage
+              Resource: !Sub ${ConnectQueue.Arn}
+      Environment:
+        Variables:
+          CONNECT_QUEUE: !Ref ConnectQueue
+          AGW_ENDPOINT:
+            !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
+          AWS_REGION: !Sub ${AWS::Region}
 
-  SendMessagePermission:
+  AGWControlInvokePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
       - Monologue
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref SendMessageFunction
+      FunctionName: !Ref ControlFunction
       Principal: apigateway.amazonaws.com
+
+  ConnectQueue:
+    Type: AWS::SQS::Queue
+    Properties:
+      RedrivePolicy:
+        deadLetterTargetArn: !Sub ${ConnectDeadLetterQueue.Arn}
+        maxReceiveCount: 10
+  ConnectDeadLetterQueue:
+    Type: AWS::SQS::Queue
 
 Outputs:
   WebSocketURI:

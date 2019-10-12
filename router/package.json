@@ -1,0 +1,13 @@
+{
+  "name": "controller",
+  "version": "1.0.0",
+  "description": "$default and $connect handler for Monologue",
+  "main": "src/handler.js",
+  "author": "SAM CLI",
+  "license": "MIT",
+  "dependencies": {
+    "ajv": "^6.10.2",
+    "aws-sdk": "^2.548.0",
+    "debug": "^4.1.1"
+  }
+}

@@ -1,10 +1,11 @@
 {
-  "name": "monologue",
+  "name": "@rootstream/monologue",
   "version": "1.0.0",
-  "description": "serverless system-to-system messaging solution based on AWS Lambda",
+  "description": "serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS",
   "main": "index.js",
   "scripts": {
-    "package": "sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket rootstream",
+    "build": "sam build",
+    "package": "sam package --output-template-file packaged.yaml --s3-bucket rootstream",
     "deploy": "sam deploy --template-file packaged.yaml --stack-name monologue --capabilities CAPABILITY_IAM",
     "describe": "aws cloudformation describe-stacks --stack-name monologue --query 'Stacks[].Outputs'",
     "undeploy": "aws cloudformation delete-stack --stack-name monologue",
