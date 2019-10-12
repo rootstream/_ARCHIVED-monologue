@@ -62,7 +62,7 @@ Resources:
       IntegrationUri:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${ControlFunction.Arn}/invocations
 
-  ControlFunction:
+  RouterFunction:
     Type: AWS::Serverless::Function
     Properties:
       CodeUri: router/
@@ -94,13 +94,13 @@ Resources:
           AGW_ENDPOINT:
             !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
 
-  AGWControlInvokePermission:
+  AGWRouterInvokePermission:
     Type: AWS::Lambda::Permission
     DependsOn:
       - Monologue
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref ControlFunction
+      FunctionName: !Ref RouterFunction
       Principal: apigateway.amazonaws.com
 
   ConnectQueue:
