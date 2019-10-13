@@ -2,7 +2,7 @@
 
 const _ = require('lodash');
 const rc = require('rc');
-const once = require('./once');
+const once = require('@rootstream/once');
 const debug = require('debug')('monologue');
 const assert = require('assert');
 const uniqid = require('uniqid');
@@ -36,15 +36,12 @@ class MonologueClient extends EventEmitter2 {
     this._ws.once('error', this.close);
     await new Promise(resolve => {
       this._ws.once('open', () => {
-        debug('connection is open for %s - sending the ID message', this._id);
-        const token = uniqid(this._id);
-        this._ws.send(JSON.stringify({ action: 'loopback', payload: { token } }));
+        debug('connection is open for %s - waiting for whoami packet', this._id);
         this._ws.once('message', data => {
-          debug('ID message received for %s:%s', this._id, data);
-          const { to, from, payload } = JSON.parse(data);
-          assert.ok(_.get(payload, 'token') === token);
-          assert.ok(to === from);
-          this._connectionId = to;
+          debug('potential whoami packet for %s:%s', this._id, data);
+          const { from, payload } = JSON.parse(data);
+          assert.ok(_.get(payload, 'type') === 'whoami');
+          this._connectionId = from;
           this._connected = true;
           this._ws.on('message', this._messageLoop.bind(this));
           this.emit('connect');
@@ -56,22 +53,20 @@ class MonologueClient extends EventEmitter2 {
 
   async _messageLoop(what) {
     debug('message received for %s:%s', this._id, what);
-    const { to, from, payload } = JSON.parse(what);
-    assert.ok(to === this._connectionId);
-
+    const { from, payload } = JSON.parse(what);
     const type = _.get(payload, 'type', '');
-    const token = _.get(payload, 'token', 'invalid');
+    const token = _.get(payload, 'data.token', 'invalid');
 
     if (type === 'REQ') {
-      const name = _.get(payload, 'name', '');
-      const args = _.get(payload, 'args', []);
+      const name = _.get(payload, 'data.name', '');
+      const args = _.get(payload, 'data.args', []);
       const fn = _.first(this.listeners(name));
-      assert.ok(_.isFunction(fn));
+      //assert.ok(_.isFunction(fn));
       const ret = await fn.apply(null, args);
-      this._ws.send(JSON.stringify({ to: from, action: 'sendmessage', payload: { token, ret, type: 'ACK' } }));
+      this._ws.send(JSON.stringify({ to: from, payload: { data: { token, ret }, type: 'ACK' } }));
     } else if (type === 'ACK') {
       assert.ok(this._callbacks[token]);
-      const ret = _.get(payload, 'ret');
+      const ret = _.get(payload, 'data.ret');
       this._callbacks[token](ret);
       delete this._callbacks[token];
     } else {
@@ -83,11 +78,11 @@ class MonologueClient extends EventEmitter2 {
   async call(to, name, ...args) {
     assert.ok(this._connected);
     const token = uniqid(this._id);
-    this._ws.send(JSON.stringify({ to, action: 'sendmessage', payload: { token, name, args, type: 'REQ' } }));
+    this._ws.send(JSON.stringify({ to, payload: { data: { token, name, args }, type: 'REQ' } }));
     return await new Promise(resolve => {
       this._callbacks[token] = resolve;
     })
-      .timeout(this._opts.timeout)
+      .timeout(+this._opts.timeout)
       .catch(err => {
         debug('call with token %s expired without a response: %o', token, err);
         delete this._callbacks[token];
@@ -96,6 +91,7 @@ class MonologueClient extends EventEmitter2 {
 
   async _doClose() {
     assert.ok(this._connected);
+    this._ws.removeAllListeners('message');
     this._ws.close();
     this._connected = false;
     this._connectionId = '';
@@ -103,7 +99,7 @@ class MonologueClient extends EventEmitter2 {
 }
 
 const DEFAULT_CONFIG = {
-  config: { endpoint: '', timeout: 5000, listeners: 100 },
+  config: { endpoint: '', timeout: 15000, listeners: 100 },
 };
 const USER_CONFIG = rc('monologue', DEFAULT_CONFIG);
 const CONFIG = _.assign({}, DEFAULT_CONFIG, USER_CONFIG);
