@@ -52,26 +52,29 @@ class MonologueClient extends EventEmitter2 {
   }
 
   async _messageLoop(what) {
-    debug('message received for %s:%s', this._id, what);
-    const { from, payload } = JSON.parse(what);
-    const type = _.get(payload, 'type', '');
-    const token = _.get(payload, 'data.token', 'invalid');
+    try {
+      debug('message received for %s:%s', this._id, what);
+      const { from, payload } = JSON.parse(what);
+      const type = _.get(payload, 'type', '');
+      const token = _.get(payload, 'data.token', 'invalid');
 
-    if (type === 'REQ') {
-      const name = _.get(payload, 'data.name', '');
-      const args = _.get(payload, 'data.args', []);
-      const fn = _.first(this.listeners(name));
-      //assert.ok(_.isFunction(fn));
-      const ret = await fn.apply(null, args);
-      this._ws.send(JSON.stringify({ to: from, payload: { data: { token, ret }, type: 'ACK' } }));
-    } else if (type === 'ACK') {
-      assert.ok(this._callbacks[token]);
-      const ret = _.get(payload, 'data.ret');
-      this._callbacks[token](ret);
-      delete this._callbacks[token];
-    } else {
-      debug('invalid message type: %s', type);
-      assert.ok(false);
+      if (type === 'REQ') {
+        const name = _.get(payload, 'data.name', '');
+        const args = _.get(payload, 'data.args', []);
+        const fn = _.first(this.listeners(name));
+        assert.ok(fn);
+        const ret = await fn.apply(null, args);
+        this._ws.send(JSON.stringify({ to: from, payload: { data: { token, ret }, type: 'ACK' } }));
+      }
+
+      if (type === 'ACK') {
+        assert.ok(this._callbacks[token]);
+        const ret = _.get(payload, 'data.ret');
+        this._callbacks[token](ret);
+        delete this._callbacks[token];
+      }
+    } catch (err) {
+      debug('error while processing message %s: %o', what, err);
     }
   }
 
@@ -86,6 +89,7 @@ class MonologueClient extends EventEmitter2 {
       .catch(err => {
         debug('call with token %s expired without a response: %o', token, err);
         delete this._callbacks[token];
+        throw err; // return back to caller
       });
   }
 

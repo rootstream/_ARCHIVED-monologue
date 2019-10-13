@@ -45,6 +45,10 @@ describe('Monologue client tests', () => {
       await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
     });
 
+    it('should throw if calling a non existent function', async () => {
+      await chai.assert.isRejected(mc2.call(mc1.connectionId, 'invalid-function'));
+    });
+
     it('should be able to pass arguments in correct order', async () => {
       const callback = sinon.fake();
       const functionName = 'test1';
