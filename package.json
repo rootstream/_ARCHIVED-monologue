@@ -12,6 +12,8 @@
     "configure:header": "echo '[opts]' > .monologuerc",
     "configure:endpoint": "echo endpoint=$(aws cloudformation describe-stacks --stack-name $STACK --output text --query 'Stacks[].Outputs[].OutputValue') >> .monologuerc",
     "undeploy": "aws cloudformation delete-stack --stack-name $STACK",
+    "undeploy:prod": "STACK=monologue npm run undeploy",
+    "undeploy:test": "STACK=monologue-test npm run undeploy",
     "redploy": "npm-run-all clean build package deploy describe configure",
     "redploy:prod": "STACK=monologue npm run redploy",
     "redploy:test": "STACK=monologue-test npm run redploy",
