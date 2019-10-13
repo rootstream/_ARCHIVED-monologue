@@ -1,3 +1,5 @@
+'use strict';
+
 const _ = require('lodash');
 const AJV = require('ajv');
 const AWS = require('aws-sdk');
@@ -42,7 +44,7 @@ const messageSchema = {
       required: ['type'],
     },
   },
-  required: ['to', 'from'],
+  required: ['to', 'from', 'payload'],
 };
 
 AWS.config.update({ region: process.env.DEPLOY_REGION });
@@ -61,32 +63,31 @@ async function route(message) {
     .promise();
 }
 
-exports.handler = async function(event, context) {
+exports.lambdaHandler = async function(event, context) {
   debug('event: %o context: %o', event, context);
   if (event.Records) {
     // this message is a batch coming from SQS
     await Promise.all(event.Records.map(record => route(JSON.parse(record.body))));
   } else if (_.get(event, 'requestContext.routeKey') === '$connect') {
     // this message is triggered by the $connect route
-    debug('connecting $connect message in queue: %s', process.env.CONNECT_QUEUE);
+    debug('pushing $connect message in queue: %s', process.env.CONNECT_QUEUE);
     await sqs
       .sendMessage({
         MessageBody: JSON.stringify({
           to: event.requestContext.connectionId,
           from: event.requestContext.connectionId,
-          payload: {
-            type: 'whoami',
-            data: {
-              connectionId: event.requestContext.connectionId,
-            },
-          },
+          payload: { type: 'whoami' },
         }),
         QueueUrl: process.env.CONNECT_QUEUE,
+        DelaySeconds: process.env.CONNECT_DELAY,
       })
       .promise();
   } else {
     // this message is coming from all other unregistered routes ($default)
     const message = JSON.parse(event.body);
+    _.set(message, 'from', event.requestContext.connectionId);
     await route(message);
   }
+
+  return { statusCode: 200, body: 'OK' };
 };

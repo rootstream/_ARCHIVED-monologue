@@ -1,7 +1,7 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  RootStream Monologue
+  RootStream Monologue -
 
   serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS
 
@@ -9,6 +9,9 @@ Parameters:
   DefaultStage:
     Type: String
     Default: latest
+  ConnectDelay:
+    Type: Number
+    Default: 1
 
 Resources:
   Monologue:
@@ -72,7 +75,7 @@ Resources:
     Properties:
       FunctionName: !Sub 'monologue-${AWS::AccountId}'
       CodeUri: router/
-      Handler: app.handler
+      Handler: app.lambdaHandler
       MemorySize: 256
       Runtime: nodejs10.x
       Events:
@@ -97,6 +100,7 @@ Resources:
       Environment:
         Variables:
           DEBUG: monologue:*
+          CONNECT_DELAY: !Ref ConnectDelay
           CONNECT_QUEUE: !Ref ConnectQueue
           DEPLOY_REGION: !Sub ${AWS::Region}
           AGW_ENDPOINT:
