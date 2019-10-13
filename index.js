@@ -12,9 +12,9 @@ const { EventEmitter2 } = require('eventemitter2');
 
 class MonologueClient extends EventEmitter2 {
   constructor(opts) {
-    super({ wildcard: true, maxListeners: getConfig().config.listeners });
+    super({ wildcard: true, maxListeners: getConfig().opts.listeners });
     this._id = uniqid('client');
-    this._opts = _.defaultsDeep(opts, getConfig().config);
+    this._opts = _.defaultsDeep(opts, getConfig().opts);
     this._callbacks = [];
     this._connected = false;
     this._connectionId = '';
@@ -103,7 +103,7 @@ class MonologueClient extends EventEmitter2 {
 }
 
 const DEFAULT_CONFIG = {
-  config: { endpoint: '', timeout: 15000, listeners: 100 },
+  opts: { endpoint: '', timeout: 15000, listeners: 100 },
 };
 const USER_CONFIG = rc('monologue', DEFAULT_CONFIG);
 const CONFIG = _.assign({}, DEFAULT_CONFIG, USER_CONFIG);
