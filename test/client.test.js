@@ -35,6 +35,12 @@ describe('Monologue client tests', () => {
       await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
       await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
     });
+
+    it('should throw when connecting to an invalid endpoint', async () => {
+      const mc = new Monologue({ endpoint: 'wss://localhost/latest' });
+      await chai.assert.isRejected(mc.connect());
+      await chai.assert.isRejected(mc.close());
+    });
   });
 
   describe('RPC tests', async () => {
