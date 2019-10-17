@@ -47,41 +47,28 @@ const messageSchema = {
   required: ['to', 'from', 'payload'],
 };
 
-AWS.config.update({ region: process.env.DEPLOY_REGION });
-const agw = new AWS.ApiGatewayManagementApi({ endpoint: process.env.AGW_ENDPOINT });
-const sqs = new AWS.SQS();
+AWS.config.update({ region: process.env.REGION });
+const agw = new AWS.ApiGatewayManagementApi({ endpoint: process.env.ENDPOINT });
+
+async function send(to, message) {
+  assert.ok(_.isString(to));
+  assert.ok(_.isString(message));
+  await agw.postToConnection({ ConnectionId: to, Data: message }).promise();
+}
 
 async function route(message) {
-  debug('routing message %o to: %s', message, process.env.AGW_ENDPOINT);
+  debug('routing message %o to: %s', message, process.env.ENDPOINT);
   const ajv = new AJV();
   assert.ok(ajv.validate(messageSchema, message));
-  await agw
-    .postToConnection({
-      ConnectionId: message.to,
-      Data: JSON.stringify({ from: message.from, payload: message.payload }),
-    })
-    .promise();
+  await send(message.to, JSON.stringify({ from: message.from, payload: message.payload }));
 }
 
 exports.lambdaHandler = async function(event, context) {
   debug('event: %o context: %o', event, context);
-  if (event.Records) {
-    // this message is a batch coming from SQS
-    await Promise.all(event.Records.map(record => route(JSON.parse(record.body))));
-  } else if (_.get(event, 'requestContext.routeKey') === '$connect') {
-    // this message is triggered by the $connect route
-    debug('pushing $connect message in queue: %s', process.env.CONNECT_QUEUE);
-    await sqs
-      .sendMessage({
-        MessageBody: JSON.stringify({
-          to: event.requestContext.connectionId,
-          from: event.requestContext.connectionId,
-          payload: { type: 'whoami' },
-        }),
-        QueueUrl: process.env.CONNECT_QUEUE,
-        DelaySeconds: process.env.CONNECT_DELAY,
-      })
-      .promise();
+  if (_.get(event, 'body') === 'whoami') {
+    const connId = event.requestContext.connectionId;
+    debug('sending a whoami packet to: %s', connId);
+    await send(connId, connId);
   } else {
     // this message is coming from all other unregistered routes ($default)
     const message = JSON.parse(event.body);

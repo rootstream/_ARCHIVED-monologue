@@ -6,12 +6,9 @@ Description: >
   serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS
 
 Parameters:
-  DefaultStage:
+  StageName:
     Type: String
     Default: latest
-  ConnectDelay:
-    Type: Number
-    Default: 1
 
 Resources:
   Monologue:
@@ -28,41 +25,26 @@ Resources:
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - DefaultRoute
-      - ConnectRoute
+      - Route
     Properties:
       ApiId: !Ref Monologue
 
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      StageName: !Ref DefaultStage
+      StageName: !Ref StageName
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
 
-  DefaultRoute:
+  Route:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref Monologue
       RouteKey: $default
       AuthorizationType: NONE
-      Target: !Join
-        - '/'
-        - - 'integrations'
-          - !Ref AGWIntegration
+      Target: !Join ['/', ['integrations', !Ref Integration]]
 
-  ConnectRoute:
-    Type: AWS::ApiGatewayV2::Route
-    Properties:
-      ApiId: !Ref Monologue
-      RouteKey: $connect
-      AuthorizationType: NONE
-      Target: !Join
-        - '/'
-        - - 'integrations'
-          - !Ref AGWIntegration
-
-  AGWIntegration:
+  Integration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref Monologue
@@ -73,17 +55,10 @@ Resources:
   RouterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      FunctionName: !Sub 'monologue-${AWS::AccountId}'
       CodeUri: router/
       Handler: app.lambdaHandler
       MemorySize: 256
       Runtime: nodejs10.x
-      Events:
-        ConnectSQSEvent:
-          Type: SQS
-          Properties:
-            Queue: !GetAtt ConnectQueue.Arn
-            BatchSize: 10
       Policies:
         - Statement:
             - Effect: Allow
@@ -91,36 +66,18 @@ Resources:
                 - 'execute-api:ManageConnections'
               Resource:
                 - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*'
-        - Statement:
-            - Effect: Allow
-              Action:
-                - 'sqs:SendMessage'
-                - 'sqs:SendMessageBatch'
-              Resource: !Sub ${ConnectQueue.Arn}
       Environment:
         Variables:
           DEBUG: monologue:*
-          CONNECT_DELAY: !Ref ConnectDelay
-          CONNECT_QUEUE: !Ref ConnectQueue
-          DEPLOY_REGION: !Sub ${AWS::Region}
-          AGW_ENDPOINT:
-            !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref DefaultStage]]
+          REGION: !Sub ${AWS::Region}
+          ENDPOINT: !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref StageName]]
 
-  AGWRouterInvokePermission:
+  InvokePermission:
     Type: AWS::Lambda::Permission
     Properties:
       Action: lambda:InvokeFunction
       FunctionName: !Ref RouterFunction
       Principal: apigateway.amazonaws.com
-
-  ConnectQueue:
-    Type: AWS::SQS::Queue
-    Properties:
-      RedrivePolicy:
-        deadLetterTargetArn: !Sub ${ConnectDeadLetterQueue.Arn}
-        maxReceiveCount: 10
-  ConnectDeadLetterQueue:
-    Type: AWS::SQS::Queue
 
 Outputs:
   WebSocketURI:

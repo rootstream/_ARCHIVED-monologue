@@ -32,19 +32,20 @@ class MonologueClient extends EventEmitter2 {
     assert.ok(!this._connected);
     debug('connecting to websocket endpoint: %s', this._opts.endpoint);
     this._ws = new WebSocket(this._opts.endpoint);
-    this._ws.once('close', this.close);
-    this._ws.once('error', this.close);
+    const silentClose = async () => {
+      await this.close().catch(debug);
+    };
+    this._ws.once('close', silentClose);
+    this._ws.once('error', silentClose);
     await new Promise(resolve => {
       this._ws.once('open', () => {
-        debug('connection is open for %s - waiting for whoami packet', this._id);
+        debug('connection is open for %s - sending whoami packet', this._id);
+        this._ws.send('whoami');
         this._ws.once('message', data => {
-          debug('potential whoami packet for %s:%s', this._id, data);
-          const { from, payload } = JSON.parse(data);
-          assert.ok(_.get(payload, 'type') === 'whoami');
-          this._connectionId = from;
+          debug('whoami packet for %s:%s', this._id, data);
+          this._connectionId = data;
           this._connected = true;
           this._ws.on('message', this._messageLoop.bind(this));
-          this.emit('connect');
           resolve();
         });
       });
@@ -103,7 +104,7 @@ class MonologueClient extends EventEmitter2 {
 }
 
 const DEFAULT_CONFIG = {
-  opts: { endpoint: '', timeout: 15000, listeners: 100 },
+  opts: { endpoint: '', timeout: 5000, listeners: 20 },
 };
 const USER_CONFIG = rc('monologue', DEFAULT_CONFIG);
 const CONFIG = _.assign({}, DEFAULT_CONFIG, USER_CONFIG);
