@@ -25,7 +25,8 @@ Resources:
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - Route
+      - DefaultRoute
+      - ConnectRoute
     Properties:
       ApiId: !Ref Monologue
 
@@ -40,21 +41,47 @@ Resources:
         DataTraceEnabled: true
         LoggingLevel: INFO
 
-  Route:
+  DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref Monologue
       RouteKey: $default
-      AuthorizationType: NONE
-      Target: !Join ['/', ['integrations', !Ref Integration]]
+      Target: !Join ['/', ['integrations', !Ref DefaultIntegration]]
 
-  Integration:
+  DefaultIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref Monologue
       IntegrationType: AWS_PROXY
       IntegrationUri:
         Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations
+
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Monologue
+      RouteKey: $connect
+      RouteResponseSelectionExpression: $default
+      Target: !Join ['/', ['integrations', !Ref ConnectIntegration]]
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Monologue
+      IntegrationType: MOCK
+      RequestTemplates:
+        200: '{"statusCode":200}'
+      TemplateSelectionExpression: '200'
+
+  ConnectIntegrationResponse:
+    Type: AWS::ApiGatewayV2::IntegrationResponse
+    Properties:
+      ApiId: !Ref Monologue
+      IntegrationId: !Ref ConnectIntegration
+      IntegrationResponseKey: $default
+      ResponseTemplates:
+        200: '{"statusCode":200}'
+      TemplateSelectionExpression: '*'
 
   RouterFunction:
     Type: AWS::Serverless::Function
