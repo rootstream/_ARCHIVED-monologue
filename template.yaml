@@ -85,6 +85,13 @@ Resources:
         '200': '{"statusCode":200}'
       TemplateSelectionExpression: '*'
 
+  ConnectRouteResponse:
+    Type: AWS::ApiGatewayV2::RouteResponse
+    Properties:
+      ApiId: !Ref Monologue
+      RouteResponseKey: $default
+      RouteId: !Ref ConnectRoute
+
   RouterFunction:
     Type: AWS::Serverless::Function
     Properties:
