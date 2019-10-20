@@ -142,3 +142,6 @@ Outputs:
   WebSocketURI:
     Description: 'Monologue WSS Protocol URI to connect to'
     Value: !Join ['', ['wss://', !Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
+  ApiKeyID:
+    Description: 'Monologue API Key ID to access the RPC backend'
+    Value: !Ref ApiKey
