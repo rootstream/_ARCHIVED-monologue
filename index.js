@@ -31,7 +31,7 @@ class MonologueClient extends EventEmitter2 {
   async _doConnect() {
     assert.ok(!this._connected);
     debug('connecting to websocket endpoint: %s', this._opts.endpoint);
-    this._ws = new WebSocket(this._opts.endpoint);
+    this._ws = new WebSocket(this._opts.endpoint, { headers: { 'x-api-key': this._opts.apiKey } });
     const silentClose = async () => {
       await this.close().catch(debug);
     };
@@ -104,7 +104,7 @@ class MonologueClient extends EventEmitter2 {
 }
 
 const DEFAULT_CONFIG = {
-  opts: { endpoint: '', timeout: 5000, listeners: 20 },
+  opts: { endpoint: '', timeout: 5000, listeners: 20, apiKey: '' },
 };
 const USER_CONFIG = rc('monologue', DEFAULT_CONFIG);
 const CONFIG = _.assign({}, DEFAULT_CONFIG, USER_CONFIG);

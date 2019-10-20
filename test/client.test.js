@@ -41,6 +41,12 @@ describe('Monologue client tests', () => {
       await chai.assert.isRejected(mc.connect());
       await chai.assert.isRejected(mc.close());
     });
+
+    it('should throw when using an invalid API key', async () => {
+      const mc = new Monologue({ apiKey: 'invalid' });
+      await chai.assert.isRejected(mc.connect());
+      await chai.assert.isRejected(mc.close());
+    });
   });
 
   describe('RPC tests', async () => {
