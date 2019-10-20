@@ -72,7 +72,7 @@ Resources:
       ApiId: !Ref Monologue
       IntegrationType: MOCK
       RequestTemplates:
-        200: '{"statusCode":200}'
+        '200': '{"statusCode":200}'
       TemplateSelectionExpression: '200'
 
   ConnectIntegrationResponse:
@@ -82,7 +82,7 @@ Resources:
       IntegrationId: !Ref ConnectIntegration
       IntegrationResponseKey: $default
       ResponseTemplates:
-        200: '{"statusCode":200}'
+        '200': '{"statusCode":200}'
       TemplateSelectionExpression: '*'
 
   RouterFunction:
