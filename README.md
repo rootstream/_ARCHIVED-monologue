@@ -1,5 +1,7 @@
 # monologue
 
+[![CircleCI](https://circleci.com/gh/rootstream/monologue/tree/master.svg?style=svg)](https://circleci.com/gh/rootstream/monologue/tree/master)
+
 Infinitely scalable serverless system-to-system messaging solution based on AWS Lambda, API Gateway and SQS.
 
 This solution was originally designed to be used in rootstream peer engine to make the engine serverless by relaying
