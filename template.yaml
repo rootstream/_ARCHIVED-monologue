@@ -17,6 +17,7 @@ Resources:
       Name: Monologue
       ProtocolType: WEBSOCKET
       RouteSelectionExpression: '$request.body.route'
+      ApiKeySelectionExpression: '$request.header.x-api-key'
       Description: >
         WSS API endpoint for a Monologue deployment.
 
@@ -61,6 +62,7 @@ Resources:
     Properties:
       ApiId: !Ref Monologue
       RouteKey: $connect
+      ApiKeyRequired: TRUE
       RouteResponseSelectionExpression: $default
       Target: !Join ['/', ['integrations', !Ref ConnectIntegration]]
 
@@ -109,6 +111,25 @@ Resources:
       Action: lambda:InvokeFunction
       FunctionName: !Ref RouterFunction
       Principal: apigateway.amazonaws.com
+
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
+    Properties:
+      ApiStages:
+        - ApiId: !Ref Monologue
+          Stage: !Ref Stage
+
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
+    Properties:
+      Enabled: true
+
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
+    Properties:
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
 
 Outputs:
   WebSocketURI:
