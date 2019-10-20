@@ -1,13 +1,25 @@
 {
-  "name": "monologue",
+  "name": "@rootstream/monologue",
   "version": "1.0.0",
-  "description": "serverless system-to-system messaging solution based on AWS Lambda",
+  "description": "serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS",
   "main": "index.js",
   "scripts": {
-    "package": "sam package --template-file template.yaml --output-template-file packaged.yaml --s3-bucket rootstream",
-    "deploy": "sam deploy --template-file packaged.yaml --stack-name monologue --capabilities CAPABILITY_IAM",
-    "describe": "aws cloudformation describe-stacks --stack-name monologue --query 'Stacks[].Outputs'",
-    "undeploy": "aws cloudformation delete-stack --stack-name monologue",
+    "build": "sam build",
+    "package": "sam package --output-template-file packaged.yaml --s3-bucket rootstream",
+    "deploy": "sam deploy --template-file packaged.yaml --stack-name $STACK --capabilities CAPABILITY_IAM",
+    "describe": "aws cloudformation describe-stacks --stack-name $STACK --query 'Stacks[].Outputs'",
+    "describe:output": "aws cloudformation describe-stacks --stack-name $STACK --output text --query \"Stacks[].Outputs[?OutputKey==\\`$KEY\\`].OutputValue\"",
+    "configure": "npm-run-all configure:header configure:endpoint configure:apiKey",
+    "configure:header": "echo '[opts]' > .monologuerc",
+    "configure:endpoint": "echo endpoint=$(KEY=WebSocketURI npm run --silent describe:output) >> .monologuerc",
+    "configure:apiKey": "echo apiKey=$(aws apigateway get-api-key --output text --query value --include-value --api-key `KEY=ApiKeyID npm run --silent describe:output`) >> .monologuerc",
+    "undeploy": "aws cloudformation delete-stack --stack-name $STACK",
+    "undeploy:prod": "STACK=monologue npm run undeploy",
+    "undeploy:test": "STACK=monologue-test npm run undeploy",
+    "redploy": "npm-run-all clean build package deploy describe configure",
+    "redploy:prod": "STACK=monologue npm run redploy",
+    "redploy:test": "STACK=monologue-test npm run redploy",
+    "clean": "git clean -xdf -e node_modules && rm -rf .aws-sam",
     "test": "nyc mocha"
   },
   "repository": {
@@ -21,6 +33,7 @@
   },
   "homepage": "https://github.com/rootstream/monologue#readme",
   "dependencies": {
+    "@rootstream/once": "^1.0.0",
     "bluebird": "^3.5.5",
     "debug": "^4.1.1",
     "eventemitter2": "^5.0.1",
@@ -37,6 +50,7 @@
     "eslint-config-prettier": "^6.3.0",
     "eslint-plugin-prettier": "^3.1.1",
     "mocha": "^6.2.0",
+    "npm-run-all": "^4.1.5",
     "nyc": "^14.1.1",
     "prettier": "^1.18.2",
     "sinon": "^7.5.0"

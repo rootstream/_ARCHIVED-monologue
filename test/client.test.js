@@ -1,6 +1,5 @@
 'use strict';
 
-const once = require('../once');
 const chai = require('chai');
 const sinon = require('sinon');
 const chaiAP = require('chai-as-promised');
@@ -15,61 +14,74 @@ describe('Monologue client tests', () => {
     chai.assert.isTrue(true);
   });
 
-  it('should be able to connect and disconnect', async () => {
-    const callback = sinon.fake();
+  describe('network tests', () => {
+    it('should be able to connect and disconnect', async () => {
+      const mc1 = new Monologue();
+      const mc2 = new Monologue();
 
-    const mc1 = new Monologue();
-    await mc1.connect();
-
-    const mc2 = new Monologue();
-    await mc2.connect();
-
-    mc1.on('sample-method', async arg1 => {
-      callback(arg1);
-      return 'data';
+      await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
+      await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
+      // double close should be a noop
+      await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
     });
 
-    const ret = await mc2.call(mc1.connectionId, 'sample-method', 'arg1');
-    chai.assert.equal(ret, 'data');
-    chai.assert.ok(callback.calledOnce);
-    chai.assert.ok(callback.calledWith('arg1'));
+    it('should be able to reconnect after a disconnect', async () => {
+      const mc1 = new Monologue();
+      const mc2 = new Monologue();
 
-    await Promise.all([mc1.close(), mc2.close()]);
+      await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
+      await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
+      // attempt a reconnect
+      await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
+      await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
+    });
+
+    it('should throw when connecting to an invalid endpoint', async () => {
+      const mc = new Monologue({ endpoint: 'wss://localhost/latest' });
+      await chai.assert.isRejected(mc.connect());
+      await chai.assert.isRejected(mc.close());
+    });
+
+    it('should throw when using an invalid API key', async () => {
+      const mc = new Monologue({ apiKey: 'invalid' });
+      await chai.assert.isRejected(mc.connect());
+      await chai.assert.isRejected(mc.close());
+    });
   });
 
-  it('should call an async function only once', async () => {
-    const callback = sinon.fake();
-    const returns = { test: 'data' };
-    const error = new Error('test');
+  describe('RPC tests', async () => {
+    const mc1 = new Monologue();
+    const mc2 = new Monologue();
 
-    async function incrementor() {
-      await Promise.delay(50);
-      callback();
-      // to check returns
-      if (callback.calledTwice) return returns;
-      if (callback.calledThrice) throw error;
-    }
+    before(async () => {
+      await chai.assert.isFulfilled(Promise.all([mc1.connect(), mc2.connect()]));
+    });
 
-    const incrementOnce = once(incrementor);
-    // firing two of these at the same time should only call one of them
-    await chai.assert.isFulfilled(Promise.all([incrementOnce(), incrementOnce()]));
-    chai.assert.isTrue(callback.calledOnce);
-    // calling it again should not work since it's not marked reentrant
-    await chai.assert.isFulfilled(incrementOnce());
-    chai.assert.isTrue(callback.calledOnce);
-    callback.resetHistory();
+    it('should throw if calling a non existent function', async () => {
+      await chai.assert.isRejected(mc2.call(mc1.connectionId, 'invalid-function'));
+    });
 
-    const incrementOnceRE = once(incrementor, { reentrant: true });
-    // firing two of these at the same time should only call one of them
-    await chai.assert.isFulfilled(Promise.all([incrementOnceRE(), incrementOnceRE()]));
-    chai.assert.isTrue(callback.calledOnce);
-    // calling it again should work since it's marked reentrant
-    const data = await chai.assert.isFulfilled(incrementOnceRE());
-    chai.assert.isTrue(callback.calledTwice);
-    chai.assert.deepEqual(data, returns);
-    // test error propagation
-    await chai.assert.isRejected(incrementOnceRE());
-    chai.assert.isTrue(callback.calledThrice);
-    callback.resetHistory();
+    it('should be able to pass arguments in correct order', async () => {
+      const callback = sinon.fake();
+      const functionName = 'test1';
+      const arg1Val = 'string1';
+      const arg2Val = { data: 'string1' };
+      const arg3Val = true;
+      const retVal = { sample: 'data2' };
+
+      mc1.on(functionName, async (arg1, arg2, arg3) => {
+        callback(arg1, arg2, arg3);
+        return retVal;
+      });
+
+      const ret = await mc2.call(mc1.connectionId, functionName, arg1Val, arg2Val, arg3Val);
+      chai.assert.deepEqual(ret, retVal);
+      chai.assert.ok(callback.calledOnce);
+      chai.assert.ok(callback.calledWith(arg1Val, arg2Val, arg3Val));
+    });
+
+    after(async () => {
+      await chai.assert.isFulfilled(Promise.all([mc1.close(), mc2.close()]));
+    });
   });
 });

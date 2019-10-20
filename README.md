@@ -1,64 +1,115 @@
 # monologue
 
-Infinitely scalable serverless system-to-system messaging solution based on AWS Lambda.
+[![CircleCI](https://circleci.com/gh/rootstream/monologue/tree/master.svg?style=svg)](https://circleci.com/gh/rootstream/monologue/tree/master)
 
-This solution was originally designed to be used in rootstream peer engine to make the
-engine serverless by relaying messages in between instances.
+Infinitely scalable serverless system-to-system messaging solution based on AWS Lambda, API Gateway and SQS.
 
-## deploy
+This solution was originally designed to be used in rootstream peer engine to make the engine serverless by relaying
+messages in between instances.
+
+## usage
+
+```bash
+npm install --save @rootstream/monologue
+```
+
+Before you continue, you need to have a working deployment. See section below on how to deploy this to your AWS account.
+
+The API is modeled after Socket.IO [ACKs](https://socket.io/docs/#Sending-and-getting-data-acknowledgements).
+
+```JS
+const Monologue = require('@rootstream/monologue);
+
+const machine1 = new Monologue();
+await machine1.connect();
+machine1.on('sample-method', async (arg1, arg2) => {
+  return `hello from ${arg1} ${arg2}!`;
+})
+
+const machine2 = new Monologue();
+await machine2.connect();
+await machine2.call(machine1.id, 'sample-method', 'from', 'machine1').then(ret => {
+  console.log(ret); // prints: "hello from machine1!"
+})
+```
+
+## deploy and test
 
 You need both AWS and AWS SAM CLIs installed and configured.
 
 To deploy to your AWS account:
 
 ```bash
-npm run package
-npm run deploy
-npm run describe
+# to deploy a production stack
+npm run redploy:prod
+# to deploy a test stack
+npm run redploy:test
+# to run tests
+npm test
 ```
+
+After a successful deployment, you'll get a `.monologuerc` file with your Monologue endpoint and API key used during web
+socket connections to API Gateway.
 
 To remove the deployment:
 
 ```bash
-npm run undeploy
+# to remove deployment of the production stack
+npm run undploy:prod
+# to remove deployment of the test stack
+npm run undploy:test
 ```
 
-## test drive
+## API
 
-you can use `wscat` utility to test the deployment (`npm install -g wscat`)
+### `new Monologue(options)`
 
-bash window 1:
+Constructor, creates a new instance of the RPC client.
 
-```bash
-wscat -c wss://btfufl6oid.execute-api.us-west-2.amazonaws.com/latest
-connected (press CTRL+C to quit)
-> {"action":"loopback"}
-< {"to":"AtuLLemUPHcCItg=","from":"AtuLLemUPHcCItg="}
-> {"action":"sendmessage","payload":"hello!","to":"AtuMbe4FvHcCE0g="}
-< {"to":"AtuLLemUPHcCItg=","from":"AtuMbe4FvHcCE0g=","payload":"hello!"}
-> {"action":"sendmessage","payload":"hello hello!","to":"AtuMbe4FvHcCE0g="}
-< {"to":"AtuLLemUPHcCItg=","from":"AtuMbe4FvHcCE0g=","payload":"hello!???"}
-```
+#### options
 
-bash window 2:
+- `endpoint`: Monologue endpoint to connect to
+- `apiKey`: API key to be used to connect to the Monologue endpoint
+- `timeout`: timeout for all network operations over websocket (before RPC calls are considered expired - default: 15s)
+- `listeners`: maximum number of RPC methods you are trying to register over Monologue (default: 100)
 
-```bash
-wscat -c wss://btfufl6oid.execute-api.us-west-2.amazonaws.com/latest
-connected (press CTRL+C to quit)
-> {"action":"loopback"}
-< {"to":"AtuMbe4FvHcCE0g=","from":"AtuMbe4FvHcCE0g="}
-< {"to":"AtuMbe4FvHcCE0g=","from":"AtuLLemUPHcCItg=","payload":"hello!"}
-> {"action":"sendmessage","payload":"hello!","to":"AtuLLemUPHcCItg="}
-< {"to":"AtuMbe4FvHcCE0g=","from":"AtuLLemUPHcCItg=","payload":"hello hello!"}
-> {"action":"sendmessage","payload":"hello!???","to":"AtuLLemUPHcCItg="}
-```
+### `connect()`
+
+Attempts to connect to the endpoint passed in the constructor. This is an async method. You should `await` it. This is
+not reentrant!
+
+### `call(to, name, ...args)`
+
+Calls into a method named `name` on registered client with id `to`.
+
+- `to`: ID of the remote machine. Can be obtained via `.connectionId` property on a `Monologue` instance
+- `name`: name of the remote RPC method
+- `...args`: any number of arguments passed to the remote method
+
+This is an async method. You should `await` it. Result of the `await` is remote method's return value.
+
+### `close()`
+
+Closes the connection. You should `await` it. This is not reentrant!
+
+## limits
+
+Apart from all limits of AWS Lambda and API Gateway, you should know that Monologue was not designed to be able to
+handle RPC connections that need to last hours. The maximum connection time is 2 hours. After 2 hours the websocket is
+closed and upon reconnection a new ID is generated.
 
 ## design
 
-Monologue is extremely simple in design. Once deployed it creates exactly two routes
-within an API Gateway websocket deployment. The two routes are:
+Monologue is extremely simple in design. Components in its design are as follows:
 
-1. `sendmessage`: accepts a `to` field and an optional `payload` field. `to` is an API Gateway connection ID, This route then sends the payload to the specified connection ID in API Gateway.
-1. `loopback`: accepts an optional `payload` field. This route then sends the payload back to the sender with its connection ID in API Gateway. Used for connection identification.
+1. API Gateway websocket
+1. AWS Lambda nodejs
 
-The Monologue client uses these two routes to implement a peer to peer RPC solution very similar to [socket.io ACKs](https://socket.io/docs/#Sending-and-getting-data-acknowledgements).
+Upon connection through `connect()`, API Gateway verifies the validity of the API key. After connection, client sends a
+`whoami` packet. The response will be processed by the Lambda and it's the connection ID that Lambda sees.
+
+Upon receive of the `whoami` response, the machine knows its connection ID and can call into other connected machines.
+
+Calls are done over an asynchronous request/response pattern. Caller sends a request packet with function name and args.
+Callee sends back a response packet with function's return value. Response and request calls are identified from each
+other by randomly generated tokens.

@@ -1,9 +1,14 @@
-AWSTemplateFormatVersion: "2010-09-09"
+AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  monologue
+  RootStream Monologue -
 
-  serverless system-to-system messaging solution based on AWS Lambda
+  serverless system-to-system messaging and RPC based on AWS Lambda, API Gateway, and SQS
+
+Parameters:
+  StageName:
+    Type: String
+    Default: latest
 
 Resources:
   Monologue:
@@ -11,7 +16,8 @@ Resources:
     Properties:
       Name: Monologue
       ProtocolType: WEBSOCKET
-      RouteSelectionExpression: "$request.body.action"
+      RouteSelectionExpression: '$request.body.route'
+      ApiKeySelectionExpression: '$request.header.x-api-key'
       Description: >
         WSS API endpoint for a Monologue deployment.
 
@@ -20,121 +26,122 @@ Resources:
   Deployment:
     Type: AWS::ApiGatewayV2::Deployment
     DependsOn:
-      - LoopbackRoute
-      - SendMessageRoute
+      - DefaultRoute
+      - ConnectRoute
     Properties:
       ApiId: !Ref Monologue
 
   Stage:
     Type: AWS::ApiGatewayV2::Stage
     Properties:
-      StageName: latest
-      Description: Latest Stable Stage
+      StageName: !Ref StageName
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
+      DefaultRouteSettings:
+        DetailedMetricsEnabled: true
+        DataTraceEnabled: true
+        LoggingLevel: INFO
 
-  LoopbackRoute:
+  DefaultRoute:
     Type: AWS::ApiGatewayV2::Route
     Properties:
       ApiId: !Ref Monologue
-      RouteKey: loopback
-      AuthorizationType: NONE
-      OperationName: LoopbackRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref LoopbackIntegration
+      RouteKey: $default
+      Target: !Join ['/', ['integrations', !Ref DefaultIntegration]]
 
-  LoopbackIntegration:
+  DefaultIntegration:
     Type: AWS::ApiGatewayV2::Integration
     Properties:
       ApiId: !Ref Monologue
-      Description: Loopback Integration
       IntegrationType: AWS_PROXY
       IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${LoopbackFunction.Arn}/invocations
+        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${RouterFunction.Arn}/invocations
 
-  LoopbackFunction:
+  ConnectRoute:
+    Type: AWS::ApiGatewayV2::Route
+    Properties:
+      ApiId: !Ref Monologue
+      RouteKey: $connect
+      ApiKeyRequired: TRUE
+      RouteResponseSelectionExpression: $default
+      Target: !Join ['/', ['integrations', !Ref ConnectIntegration]]
+
+  ConnectIntegration:
+    Type: AWS::ApiGatewayV2::Integration
+    Properties:
+      ApiId: !Ref Monologue
+      IntegrationType: MOCK
+      RequestTemplates:
+        '200': '{"statusCode":200}'
+      TemplateSelectionExpression: '200'
+
+  ConnectIntegrationResponse:
+    Type: AWS::ApiGatewayV2::IntegrationResponse
+    Properties:
+      ApiId: !Ref Monologue
+      IntegrationId: !Ref ConnectIntegration
+      IntegrationResponseKey: $default
+      ResponseTemplates:
+        '200': '{"statusCode":200}'
+      TemplateSelectionExpression: '*'
+
+  ConnectRouteResponse:
+    Type: AWS::ApiGatewayV2::RouteResponse
+    Properties:
+      ApiId: !Ref Monologue
+      RouteResponseKey: $default
+      RouteId: !Ref ConnectRoute
+
+  RouterFunction:
     Type: AWS::Serverless::Function
     Properties:
-      CodeUri: loopback/
-      Handler: app.handler
+      CodeUri: router/
+      Handler: app.lambdaHandler
       MemorySize: 256
       Runtime: nodejs10.x
       Policies:
         - Statement:
             - Effect: Allow
               Action:
-                - "execute-api:ManageConnections"
+                - 'execute-api:ManageConnections'
               Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*"
+                - !Sub 'arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*'
+      Environment:
+        Variables:
+          DEBUG: monologue:*
+          REGION: !Sub ${AWS::Region}
+          ENDPOINT: !Join ['', [!Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref StageName]]
 
-  LoopbackPermission:
+  InvokePermission:
     Type: AWS::Lambda::Permission
-    DependsOn:
-      - Monologue
     Properties:
       Action: lambda:InvokeFunction
-      FunctionName: !Ref LoopbackFunction
+      FunctionName: !Ref RouterFunction
       Principal: apigateway.amazonaws.com
 
-  SendMessageRoute:
-    Type: AWS::ApiGatewayV2::Route
+  UsagePlan:
+    Type: AWS::ApiGateway::UsagePlan
     Properties:
-      ApiId: !Ref Monologue
-      RouteKey: sendmessage
-      AuthorizationType: NONE
-      OperationName: SendMessageRoute
-      Target: !Join
-        - "/"
-        - - "integrations"
-          - !Ref SendMessageIntegration
+      ApiStages:
+        - ApiId: !Ref Monologue
+          Stage: !Ref Stage
 
-  SendMessageIntegration:
-    Type: AWS::ApiGatewayV2::Integration
+  ApiKey:
+    Type: AWS::ApiGateway::ApiKey
     Properties:
-      ApiId: !Ref Monologue
-      Description: Send Integration
-      IntegrationType: AWS_PROXY
-      IntegrationUri:
-        Fn::Sub: arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${SendMessageFunction.Arn}/invocations
+      Enabled: true
 
-  SendMessageFunction:
-    Type: AWS::Serverless::Function
+  UsagePlanKey:
+    Type: AWS::ApiGateway::UsagePlanKey
     Properties:
-      CodeUri: sendmessage/
-      Handler: app.handler
-      MemorySize: 256
-      Runtime: nodejs10.x
-      Policies:
-        - Statement:
-            - Effect: Allow
-              Action:
-                - "execute-api:ManageConnections"
-              Resource:
-                - !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${Monologue}/*"
-
-  SendMessagePermission:
-    Type: AWS::Lambda::Permission
-    DependsOn:
-      - Monologue
-    Properties:
-      Action: lambda:InvokeFunction
-      FunctionName: !Ref SendMessageFunction
-      Principal: apigateway.amazonaws.com
+      KeyId: !Ref ApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref UsagePlan
 
 Outputs:
   WebSocketURI:
-    Description: "Monologue WSS Protocol URI to connect to"
-    Value:
-      !Join [
-        "",
-        [
-          "wss://",
-          !Ref Monologue,
-          ".execute-api.",
-          !Ref "AWS::Region",
-          ".amazonaws.com/",
-          !Ref "Stage",
-        ],
-      ]
+    Description: 'Monologue WSS Protocol URI to connect to'
+    Value: !Join ['', ['wss://', !Ref Monologue, '.execute-api.', !Ref 'AWS::Region', '.amazonaws.com/', !Ref 'Stage']]
+  ApiKeyID:
+    Description: 'Monologue API Key ID to access the RPC backend'
+    Value: !Ref ApiKey

@@ -1,0 +1,14 @@
+{
+  "name": "controller",
+  "version": "1.0.0",
+  "description": "$default and $connect handler for Monologue",
+  "main": "app.js",
+  "author": "Sepehr Laal <sepehr@rootstream.com>",
+  "license": "UNLICENSED",
+  "dependencies": {
+    "ajv": "^6.10.2",
+    "aws-sdk": "^2.548.0",
+    "debug": "^4.1.1",
+    "lodash": "^4.17.15"
+  }
+}
