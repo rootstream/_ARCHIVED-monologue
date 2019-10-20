@@ -35,6 +35,10 @@ Resources:
       StageName: !Ref StageName
       DeploymentId: !Ref Deployment
       ApiId: !Ref Monologue
+      DefaultRouteSettings:
+        DetailedMetricsEnabled: true
+        DataTraceEnabled: true
+        LoggingLevel: INFO
 
   Route:
     Type: AWS::ApiGatewayV2::Route
