@@ -16,9 +16,9 @@
     "undeploy": "aws cloudformation delete-stack --stack-name $STACK",
     "undeploy:prod": "STACK=monologue npm run undeploy",
     "undeploy:test": "STACK=monologue-test npm run undeploy",
-    "redploy": "npm-run-all clean build package deploy describe configure",
-    "redploy:prod": "STACK=monologue npm run redploy",
-    "redploy:test": "STACK=monologue-test npm run redploy",
+    "redeploy": "npm-run-all clean build package deploy describe configure",
+    "redeploy:prod": "STACK=monologue npm run redeploy",
+    "redeploy:test": "STACK=monologue-test npm run redeploy",
     "clean": "git clean -xdf -e node_modules && rm -rf .aws-sam",
     "test": "nyc mocha"
   },
